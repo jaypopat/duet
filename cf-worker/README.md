@@ -1,15 +1,7 @@
-# cf-worker
+This typescript module contains code for a cf worker and a cf agent
 
-To install dependencies:
+- The CF worker acts as a load balancer which takes requests and distributes them to the agent/durable object. (we have one agent per room).
 
-```bash
-bun install
-```
+- The agent uses a llama model to answer queries, also taking the last 20 messages of the state as context for inference
 
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.3.3. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+- We also have a sandbox configured for the env, which we will utilise later - one sandbox per room with the agent being able to run commands in the sandbox session.

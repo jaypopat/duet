@@ -3,11 +3,22 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "check": "tsc -p tsconfig.json"
+  },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251211.0",
     "@types/bun": "latest",
     "wrangler": "^4.54.0"
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "^0.6.6",
+    "agents": "^0.2.32"
   }
 }
