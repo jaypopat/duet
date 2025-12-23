@@ -1,5 +1,15 @@
 import { getSandbox, Sandbox as SandboxDO } from "@cloudflare/sandbox";
 import { Agent, getAgentByName } from "agents";
+import { z } from "zod";
+
+const MessageRequestSchema = z.object({
+  text: z.string().min(1, "Text cannot be empty"),
+  userId: z.string().optional(),
+});
+
+const SandboxExecRequestSchema = z.object({
+  cmd: z.string().min(1, "Command cannot be empty"),
+});
 
 type DuetMessage = {
   role: "user" | "agent";
@@ -68,10 +78,22 @@ export class DuetAgent extends Agent<Env, DuetAgentState> {
 
     switch (url.pathname) {
       case "/message": {
-        const body = (await request.json().catch(() => ({}))) as any;
-        if (!body.text?.trim()) return Response.json({ error: "missing text" }, { status: 400 });
+        const rawBody = await request.json();
+        const parseResult = MessageRequestSchema.safeParse(rawBody);
 
-        const userMsg: DuetMessage = { role: "user", userId: body.userId?.trim(), text: body.text.trim(), ts: Date.now() };
+        if (!parseResult.success) {
+          return Response.json(
+            {
+              error: "invalid request",
+              details: z.flattenError(parseResult.error),
+            },
+            { status: 400 }
+          );
+        }
+
+        const data = parseResult.data;
+
+        const userMsg: DuetMessage = { role: "user", userId: data.userId?.trim(), text: data.text.trim(), ts: Date.now() };
 
         const aiMessages: AIMessage[] = [
           {
@@ -99,7 +121,7 @@ export class DuetAgent extends Agent<Env, DuetAgentState> {
 
           try {
             const sandbox = getSandbox(this.env.Sandbox, `sandbox-${roomId}`);
-            const {stderr, stdout} = await sandbox.exec(cmd);
+            const { stderr, stdout } = await sandbox.exec(cmd);
 
             const summary =
               stdout.slice(0, 500) ||
@@ -127,16 +149,26 @@ export class DuetAgent extends Agent<Env, DuetAgentState> {
       }
 
       case "/sandbox/exec": {
-        const body = (await request.json().catch(() => ({}))) as any;
-        if (!body.cmd?.trim()) {
-          return Response.json({ error: "missing cmd" }, { status: 400 });
+        const rawBody = await request.json();
+        const parseResult = SandboxExecRequestSchema.safeParse(rawBody);
+
+        if (!parseResult.success) {
+          return Response.json(
+            {
+              error: "invalid request",
+              details: z.flattenError(parseResult.error).fieldErrors,
+            },
+            { status: 400 }
+          );
         }
+
+        const data = parseResult.data;
         // each room gets a sandbox too
         const sandboxName = `sandbox-${roomId}`;
 
         try {
           const sandbox = getSandbox(this.env.Sandbox, sandboxName);
-          const result = await sandbox.exec(body.cmd);
+          const result = await sandbox.exec(data.cmd);
 
 
           return Response.json({ result, sandboxName });

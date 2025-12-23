@@ -12,8 +12,6 @@ bindings = [
 [ai]
 binding = "AI"
 
-
-
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["DuetAgent"]
