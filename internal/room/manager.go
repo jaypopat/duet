@@ -1,10 +1,10 @@
 package room
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -13,36 +13,42 @@ var (
 )
 
 type Manager struct {
-	rooms map[string]*Room
-	mu    sync.RWMutex
+	rooms    map[string]*Room
+	metadata map[string]*RoomMetadata // Room metadata to show in active rooms list (DEV)
+	mu       sync.RWMutex
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		rooms: make(map[string]*Room),
+		rooms:    make(map[string]*Room),
+		metadata: make(map[string]*RoomMetadata),
 	}
 }
 
-func (m *Manager) CreateRoom(hostPubKey string) (*Room, error) {
+// CreateRoom creates a new room with a generated UUID
+func (m *Manager) CreateRoom(host, description string) (*Room, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	roomID := generateRoomID()
-
-	if _, exists := m.rooms[roomID]; exists {
-		return nil, ErrRoomExists
-	}
+	roomID := uuid.New().String()
 
 	room := &Room{
 		ID:          roomID,
-		Host:        hostPubKey,
+		Description: description,
+		Host:        host,
 		Connections: make([]*Client, 0),
 	}
 
 	m.rooms[roomID] = room
+
+	// Store metadata for display in active rooms list
+	m.metadata[roomID] = &RoomMetadata{
+		ID:          roomID,
+		Description: description,
+	}
+
 	return room, nil
 }
-
 func (m *Manager) GetRoom(roomID string) (*Room, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -55,31 +61,21 @@ func (m *Manager) GetRoom(roomID string) (*Room, error) {
 	return room, nil
 }
 
-func (m *Manager) DeleteRoom(roomID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.rooms, roomID)
-}
-
-func (m *Manager) ListRooms() []string {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	ids := make([]string, 0, len(m.rooms))
-	for id, _ := range m.rooms {
-		ids = append(ids, id)
-	}
-	return ids
-}
-
 func (m *Manager) RoomCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.rooms)
 }
 
-func generateRoomID() string {
-	b := make([]byte, 4)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+func (m *Manager) ListActiveRooms() []*RoomMetadata {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []*RoomMetadata
+	for id := range m.rooms {
+		if meta, exists := m.metadata[id]; exists {
+			result = append(result, meta)
+		}
+	}
+	return result
 }
