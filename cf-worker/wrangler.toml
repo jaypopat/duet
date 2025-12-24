@@ -1,0 +1,32 @@
+name = "duet-cf-worker"
+main = "index.ts"
+compatibility_date = "2025-12-13"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [
+  { name = "DUET_AGENT", class_name = "DuetAgent" },
+  { name = "Sandbox", class_name = "Sandbox" },
+]
+
+[ai]
+binding = "AI"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DuetAgent"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Sandbox"]
+
+[[containers]]
+class_name = "Sandbox"
+image = "./Dockerfile"
+
+[observability]
+[observability.logs]
+enabled = false
+head_sampling_rate = 1
+invocation_logs = true
+persist = true

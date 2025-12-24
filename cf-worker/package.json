@@ -1,0 +1,28 @@
+{
+  "name": "cf-worker",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "check": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.10",
+    "@cloudflare/vitest-pool-workers": "0.5.14",
+    "@types/bun": "latest",
+    "ultracite": "6.5.0",
+    "vitest": "2.1.1",
+    "wrangler": "^4.54.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "^0.6.6",
+    "agents": "^0.2.32",
+    "zod": "^4.2.1"
+  }
+}
