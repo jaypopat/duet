@@ -26,10 +26,11 @@ type Styles struct {
 	sidebarStyle     lipgloss.Style
 	terminalStyle    lipgloss.Style
 	aiSidebarStyle   lipgloss.Style
-	toastStyle       lipgloss.Style
 	helpStyle        lipgloss.Style
 	inputPrefixStyle lipgloss.Style
 	logoStyle        lipgloss.Style
+	inputBoxStyle    lipgloss.Style
+	bottomBarStyle   lipgloss.Style
 }
 
 // NewStyles creates renderer-aware styles for the given renderer
@@ -78,9 +79,6 @@ func NewStyles(renderer *lipgloss.Renderer) *Styles {
 			BorderLeft(true).
 			BorderForeground(colorBorder).
 			Padding(1),
-		toastStyle: baseStyle.
-			Foreground(colorToast).
-			PaddingLeft(2),
 		helpStyle: baseStyle.
 			Foreground(colorDim).
 			MarginTop(2),
@@ -92,6 +90,16 @@ func NewStyles(renderer *lipgloss.Renderer) *Styles {
 			Foreground(colorAccent).
 			Bold(true).
 			Align(lipgloss.Center),
+		inputBoxStyle: baseStyle.
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colorAccent).
+			Padding(0, 2),
+		bottomBarStyle: baseStyle.
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderTop(true).
+			BorderForeground(colorBorder).
+			PaddingTop(1).
+			Height(1),
 	}
 }
 
@@ -99,9 +107,9 @@ func NewStyles(renderer *lipgloss.Renderer) *Styles {
 var asciiLogo = `
     ██████╗ ██╗   ██╗███████╗████████╗
     ██╔══██╗██║   ██║██╔════╝╚══██╔══╝
-    ██║  ██║██║   ██║█████╗     ██║   
-    ██║  ██║██║   ██║██╔══╝     ██║   
-    ██████╔╝╚██████╔╝███████╗   ██║   
-    ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝   
+    ██║  ██║██║   ██║█████╗     ██║
+    ██║  ██║██║   ██║██╔══╝     ██║
+    ██████╔╝╚██████╔╝███████╗   ██║
+    ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝
        pair programming over ssh
 `

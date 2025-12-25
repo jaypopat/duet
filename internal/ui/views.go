@@ -54,7 +54,7 @@ func (m *Model) viewLaunch() string {
 func (m *Model) viewCreate() string {
 	title := m.styles.titleStyle.Render("Create Room")
 	prompt := m.styles.textStyle.Render("Enter a description for your room:")
-	input := m.input.View()
+	input := m.styles.inputBoxStyle.Render(m.input.View())
 	help := m.styles.helpStyle.Render("enter create • esc back")
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
@@ -69,7 +69,7 @@ func (m *Model) viewCreate() string {
 func (m *Model) viewJoin() string {
 	title := m.styles.titleStyle.Render("Join Room")
 	prompt := m.styles.textStyle.Render("Enter the room ID:")
-	input := m.input.View()
+	input := m.styles.inputBoxStyle.Render(m.input.View())
 	help := m.styles.helpStyle.Render("enter join • esc back")
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
@@ -121,11 +121,8 @@ func (m *Model) viewRoom() string {
 		aiSidebarW = 0
 	}
 
-	// Reserve height for input bar when in input mode
+	// Always reserve same height for consistent bottom bar (never changes)
 	mainHeight := m.height - 2
-	if m.inputMode != ModeNormal {
-		mainHeight = m.height - 3
-	}
 
 	sidebar := m.renderSidebar(sidebarW, mainHeight)
 	terminal := m.renderTerminal(terminalW, mainHeight)
@@ -146,16 +143,31 @@ func (m *Model) viewRoom() string {
 		bottom = m.renderToasts()
 	}
 
+	bottom = m.styles.bottomBarStyle.Width(m.width).Render(bottom)
+
 	return lipgloss.JoinVertical(lipgloss.Left, main, bottom)
 }
 
 func (m *Model) renderSidebar(w, h int) string {
 	var b strings.Builder
 
-	// Room ID
+	youLabel := m.styles.dimStyle.Render("you: ")
+	youName := m.styles.accentStyle.Bold(true).Render(m.username)
+	b.WriteString(youLabel + youName + "\n\n")
+
 	roomLabel := m.styles.dimStyle.Render("room: ")
 	roomID := m.styles.textStyle.Render(truncate(m.roomID, w-8))
-	b.WriteString(roomLabel + roomID + "\n\n")
+	b.WriteString(roomLabel + roomID + "\n")
+	
+	if m.currentRoom != nil && m.currentRoom.Description != "" {
+		desc := m.currentRoom.Description
+		if len(desc) > w-4 {
+			desc = truncate(desc, w-4)
+		}
+		descText := m.styles.dimStyle.Render("      " + "\"" + desc + "\"")
+		b.WriteString(descText + "\n")
+	}
+	b.WriteString(m.styles.dimStyle.Render(strings.Repeat("─", w-2)) + "\n\n")
 
 	// Users
 	usersLabel := m.styles.dimStyle.Render(fmt.Sprintf("connected (%d):", len(m.users)))
@@ -170,7 +182,7 @@ func (m *Model) renderSidebar(w, h int) string {
 		typingText := fmt.Sprintf("✎ %s is typing...", m.typingUser)
 		b.WriteString(m.styles.accentStyle.Render(typingText) + "\n")
 	}
-	b.WriteString("\n")
+	b.WriteString(m.styles.dimStyle.Render(strings.Repeat("─", w-2)) + "\n\n")
 
 	// Keybinds
 	keysLabel := m.styles.dimStyle.Render("keys:")
@@ -198,31 +210,72 @@ func (m *Model) renderTerminal(w, h int) string {
 }
 
 func (m *Model) renderInputBar() string {
-	var prefix string
-	switch m.inputMode {
-	case ModeAI:
-		prefix = m.styles.inputPrefixStyle.Render("[AI]")
-	case ModeSandbox:
-		prefix = m.styles.inputPrefixStyle.Render("[RUN]")
+	// Constrain input to single line to prevent height expansion
+	input := m.cmdInput.View()
+	if len(input) > m.width-30 {
+		input = truncate(input, m.width-30)
 	}
 
-	input := m.cmdInput.View()
-	help := m.styles.dimStyle.Render(" (enter submit • esc cancel)")
+	// Add mode status on the right (fixed)
+	modeText := m.getModeStatus()
+	rightStyled := m.styles.accentStyle.Bold(true).Render(modeText)
 
-	return lipgloss.JoinHorizontal(lipgloss.Left, prefix, " ", input, help)
+	// Compute widths
+	rightW := int(lipgloss.Width(rightStyled))
+	leftAvail := max(m.width - rightW - 1, 0)
+
+	// Available width for input text (no left prefix)
+	inputAvail := max(leftAvail, 0)
+
+	// Truncate input to available runes
+	if len(input) > inputAvail {
+		input = truncate(input, inputAvail)
+	}
+
+	// Build left side: input (plain)
+	left := input
+
+	// Pad between left and right to ensure fixed width
+	padCount := max(m.width - int(lipgloss.Width(left)) - rightW, 0)
+	return left + strings.Repeat(" ", padCount) + rightStyled
 }
 
 func (m *Model) renderToasts() string {
 	if len(m.toasts) == 0 {
-		return m.styles.dimStyle.Render("ctrl+g AI • ctrl+a toggle AI • ctrl+r sandbox")
+		// vim like mode display on right
+		modeText := m.getModeStatus()
+		rightStyled := m.styles.accentStyle.Bold(true).Render(modeText)
+
+		// default on left side of bar
+		helpText := "ctrl+g AI • ctrl+a toggle AI • ctrl+r sandbox"
+		
+		// available width for left plain help (account for right width)
+		avail := max(m.width - int(lipgloss.Width(rightStyled)) - 1, 0)
+		leftPlain := truncate(helpText, avail)
+		leftStyled := m.styles.dimStyle.Render(leftPlain)
+		padCount := max(m.width - int(lipgloss.Width(leftStyled)) - int(lipgloss.Width(rightStyled)), 0)
+		return leftStyled + strings.Repeat(" ", padCount) + rightStyled
 	}
 
 	var parts []string
 	for _, t := range m.toasts {
 		parts = append(parts, t.text)
 	}
+	toastText := "▸ " + strings.Join(parts, " • ")
+	return m.styles.accentStyle.Bold(true).Render(toastText)
+}
 
-	return m.styles.toastStyle.Render("▸ " + strings.Join(parts, " • "))
+
+
+func (m *Model) getModeStatus() string {
+	switch m.inputMode {
+	case ModeAI:
+		return "-- AI --"
+	case ModeSandbox:
+		return "-- RUN --"
+	default:
+		return "-- NORMAL --"
+	}
 }
 
 func (m *Model) viewResizePrompt() string {

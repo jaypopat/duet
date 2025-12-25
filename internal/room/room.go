@@ -41,6 +41,18 @@ type RoomMetadata struct {
 func (r *Room) AddClient(client *Client) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// remove existing client with same ID if present (to handle reconnections)
+	for i, c := range r.Connections {
+		if c.ID == client.ID {
+			if c.Events != nil {
+				close(c.Events)
+			}
+			r.Connections = remove(r.Connections, i)
+			break
+		}
+	}
+
 	r.Connections = append(r.Connections, client)
 
 	// Notify all other clients

@@ -51,8 +51,8 @@ type Model struct {
 	terminal    *terminal.Terminal
 	termContent string // rendered terminal content
 	users       []string
-	toasts      []toast // notifications to show
-	inputMode   InputMode // normal/AI chat/sandbox cmd
+	toasts      []toast         // notifications to show
+	inputMode   InputMode       // normal/AI chat/sandbox cmd
 	cmdInput    textinput.Model // AI/sandbox input
 	typingUser  string          // who is currently typing
 	typingTime  time.Time       // when they started typing
@@ -183,7 +183,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Event.Type {
 		case "join":
 			m.users = append(m.users, msg.Event.Username)
-			m.addToast(fmt.Sprintf("%s joined", msg.Event.Username))
+			// only show join toast for other users, not for yourself
+			if msg.Event.Username != m.username {
+				m.addToast(fmt.Sprintf("%s joined", msg.Event.Username))
+			}
 		case "leave":
 			m.users = removeUser(m.users, msg.Event.Username)
 			m.addToast(fmt.Sprintf("%s left", msg.Event.Username))
@@ -211,7 +214,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.currentRoom = msg.Room
 		m.screen = ScreenRoom
 		m.users = m.getUserList()
-		m.addToast("Joined room")
 
 		// start terminal and event listening
 		return m, tea.Batch(
@@ -608,6 +610,9 @@ func (m *Model) getUserList() []string {
 		if c.IsHost {
 			name += " (host)"
 		}
+		if c.Username == m.username {
+			name += " (you)"
+		}
 		users = append(users, name)
 	}
 	return users
@@ -695,7 +700,7 @@ func (m *Model) listenForRoomEvents() tea.Cmd {
 func (m *Model) addToast(text string) {
 	m.toasts = append(m.toasts, toast{
 		text:    text,
-		expires: time.Now().Add(5 * time.Second),
+		expires: time.Now().Add(1 * time.Second),
 	})
 	if len(m.toasts) > 3 {
 		m.toasts = m.toasts[len(m.toasts)-3:]
