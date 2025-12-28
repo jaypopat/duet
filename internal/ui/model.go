@@ -117,14 +117,13 @@ func (m *Model) Init() tea.Cmd {
 }
 
 func (m *Model) roomLayout() (sidebarW, terminalW, aiSidebarW, mainH int) {
+	sidebarW = m.width / 6
 	if m.showAISidebar {
-		sidebarW = m.width / 6
 		aiSidebarW = m.width / 4
 		terminalW = m.width - sidebarW - aiSidebarW - 2
 	} else {
-		sidebarW = m.width / 5
-		terminalW = m.width - sidebarW - 1
 		aiSidebarW = 0
+		terminalW = m.width - sidebarW - 1
 	}
 	mainH = m.height - 2
 	return
