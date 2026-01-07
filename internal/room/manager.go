@@ -2,6 +2,13 @@ package room
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -10,6 +17,19 @@ import (
 var (
 	ErrRoomNotFound = errors.New("room not found")
 )
+
+var adjectives = []string{"swift", "happy", "clever", "brave", "cosmic", "bright", "mystic", "golden"}
+var nouns = []string{"phoenix", "dragon", "tiger", "falcon", "wolf", "eagle", "panda", "orca"}
+
+func slugify(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(s, "-")
+	s = strings.Trim(s, "-")
+	if len(s) > 30 {
+		s = s[:30]
+	}
+	return s
+}
 
 type Manager struct {
 	rooms map[string]*Room
@@ -27,11 +47,38 @@ func (m *Manager) CreateRoom(host, description string) (*Room, error) {
 	defer m.mu.Unlock()
 
 	roomID := uuid.New().String()
+
+	// Generate workspace name: slugify description or random readable name
+	var workspaceName string
+	if description != "" {
+		workspaceName = slugify(description)
+	}
+	if workspaceName == "" {
+		workspaceName = fmt.Sprintf("%s-%s", adjectives[rand.Intn(len(adjectives))], nouns[rand.Intn(len(nouns))])
+	}
+
+	baseDir := "/app/workspaces"
+	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
+		baseDir = filepath.Join(os.TempDir(), "duet-workspaces")
+	}
+
+	workspaceDir := filepath.Join(baseDir, workspaceName)
+
+	// Copy workspace template for chroot environment
+	cmd := exec.Command("cp", "-r", "/app/workspace-template/.", workspaceDir)
+	if err := cmd.Run(); err != nil {
+		// local dev
+		if err := os.MkdirAll(workspaceDir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create workspace directory: %w", err)
+		}
+	}
+
 	room := &Room{
-		ID:          roomID,
-		Description: description,
-		Host:        host,
-		Connections: make([]*Client, 0),
+		ID:           roomID,
+		Description:  description,
+		Host:         host,
+		Connections:  make([]*Client, 0),
+		WorkspaceDir: workspaceDir,
 	}
 	m.rooms[roomID] = room
 	return room, nil
@@ -69,6 +116,10 @@ func (m *Manager) LeaveRoom(roomID, clientID string) bool {
 		if room.Terminal != nil {
 			room.Terminal.Close()
 			room.Terminal = nil
+		}
+		// Clean up workspace directory when room is destroyed
+		if room.WorkspaceDir != "" {
+			os.RemoveAll(room.WorkspaceDir)
 		}
 		delete(m.rooms, roomID)
 		return true

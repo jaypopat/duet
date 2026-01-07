@@ -138,4 +138,3 @@ func (c *Client) ExecCommand(ctx context.Context, roomID, cmd string) (*ExecResp
 
 	return &result, nil
 }
-

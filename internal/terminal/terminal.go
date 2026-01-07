@@ -2,13 +2,13 @@ package terminal
 
 import (
 	"fmt"
+	"github.com/creack/pty"
+	"github.com/hinshun/vt10x"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
-
-	"github.com/creack/pty"
-	"github.com/hinshun/vt10x"
+	"syscall"
 )
 
 // Terminal wraps a PTY with vt10x terminal emulation
@@ -18,8 +18,9 @@ type Terminal struct {
 	cmd  *exec.Cmd
 	mu   sync.Mutex
 
-	width  int
-	height int
+	width   int
+	height  int
+	workDir string // isolated working directory for this terminal
 
 	// Subscriber channels for multi-client broadcast
 	subscribers map[chan struct{}]struct{}
@@ -31,17 +32,21 @@ type Terminal struct {
 	dirty      bool   // needs re-render
 }
 
-func New(width, height int) *Terminal {
+func New(width, height int, workDir string) *Terminal {
 	if width < 1 {
 		width = 80
 	}
 	if height < 1 {
 		height = 24
 	}
+	if workDir == "" {
+		workDir = "/app"
+	}
 
 	return &Terminal{
 		width:       width,
 		height:      height,
+		workDir:     workDir,
 		subscribers: make(map[chan struct{}]struct{}),
 	}
 }
@@ -82,15 +87,32 @@ func (t *Terminal) Start() error {
 
 	t.vt = vt10x.New(vt10x.WithSize(t.width, t.height))
 
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/sh"
-	}
+	shell := "/bin/sh"
 
 	t.cmd = exec.Command(shell)
-	t.cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
-	)
+
+	// Use chroot for workspace isolation if workDir is set and template exists
+	if t.workDir != "" && t.workDir != "/app" {
+		if _, err := os.Stat(t.workDir + "/bin/sh"); err == nil {
+			t.cmd.SysProcAttr = &syscall.SysProcAttr{
+				Chroot: t.workDir,
+			}
+			t.cmd.Dir = "/home/duet"
+			t.cmd.Env = []string{
+				"TERM=xterm-256color",
+				"HOME=/home/duet",
+				"PATH=/bin:/usr/bin",
+				"SHELL=/bin/sh",
+			}
+		} else {
+			// Fallback if template not available (local dev)
+			t.cmd.Dir = t.workDir
+			t.cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+		}
+	} else {
+		t.cmd.Dir = t.workDir
+		t.cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+	}
 
 	var err error
 	t.ptmx, err = pty.StartWithSize(t.cmd, &pty.Winsize{

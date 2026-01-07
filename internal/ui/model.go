@@ -549,7 +549,7 @@ func (m *Model) gotoScreen(s Screen) (tea.Model, tea.Cmd) {
 	m.inputMode = ModeNormal
 	if s == ScreenCreate {
 		m.input.Reset()
-		m.input.Placeholder = "Room description..."
+		m.input.Placeholder = "Room description (optional)..."
 		m.input.Focus()
 		return m, textinput.Blink
 	}
@@ -652,7 +652,12 @@ func (m *Model) startTerminal() tea.Cmd {
 			termH = 24
 		}
 
-		m.terminal = terminal.New(terminalW, termH)
+		workDir := "/app"
+		if m.currentRoom != nil && m.currentRoom.WorkspaceDir != "" {
+			workDir = m.currentRoom.WorkspaceDir
+		}
+
+		m.terminal = terminal.New(terminalW, termH, workDir)
 
 		if err := m.terminal.Start(); err != nil {
 			return ErrorMsg{err}

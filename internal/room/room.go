@@ -28,13 +28,14 @@ type Client struct {
 }
 
 type Room struct {
-	ID          string
-	Description string
-	Host        string
-	Connections []*Client
-	mu          sync.RWMutex
-	Terminal    *terminal.Terminal
-	AIMessages  []AIMessage
+	ID           string
+	Description  string
+	Host         string
+	Connections  []*Client
+	mu           sync.RWMutex
+	Terminal     *terminal.Terminal
+	AIMessages   []AIMessage
+	WorkspaceDir string
 }
 
 func (r *Room) AddClient(client *Client) {
