@@ -8,12 +8,9 @@ RUN go build -o duet .
 # Run stage
 FROM alpine:latest
 
-RUN apk add --no-cache bash coreutils \
-    && echo "alias ls='ls --color=auto'" >> /root/.bashrc \
-    && echo "alias grep='grep --color=auto'" >> /root/.bashrc \
-    && echo "export GREP_OPTIONS='--color=auto'" >> /root/.bashrc \
-    && echo "git config --global color.ui auto" >> /root/.bashrc \
-    && echo "export TERM=xterm-256color" >> /root/.bashrc
+# for coding
+RUN apk add --no-cache neovim
+RUN apk add --no-cache nodejs npm
 
 RUN apk add --no-cache openssh
 

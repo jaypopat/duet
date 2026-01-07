@@ -9,6 +9,7 @@ SSH-first pair programming tool built with Go + Charm (Bubbletea/Wish).
 - AI Agent and access to sandbox (cloudflare stack)
 - Users can directly run commands on sandbox or let AI run commands through chat (some usecases include cloning a repo and operating file operations)
 - Usecases include teaching, interviews, and collaborative coding
+- The session has nvim and nodejs which allows for a seamless peer programming session
 
 ## How to access hosted version
 Connect to the app using `ssh <username>@duet.jaypopat.me`
