@@ -102,6 +102,28 @@ func (c *Client) SendMessage(ctx context.Context, roomID, text, userID string) (
 	return &result, nil
 }
 
+// CleanupRoom destroys sandbox and clears agent state for a room
+func (c *Client) CleanupRoom(ctx context.Context, roomID string) error {
+	url := fmt.Sprintf("%s/api/rooms/%s", c.baseURL, roomID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("create cleanup request: %w", err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("cleanup request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("cleanup failed with status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // ExecCommand executes a command in the room's sandbox
 func (c *Client) ExecCommand(ctx context.Context, roomID, cmd string) (*ExecResponse, error) {
 	url := fmt.Sprintf("%s/api/rooms/%s/sandbox/exec", c.baseURL, roomID)

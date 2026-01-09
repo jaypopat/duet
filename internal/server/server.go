@@ -14,6 +14,7 @@ import (
 	"github.com/charmbracelet/wish"
 	"github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
+	"github.com/jaypopat/duet/internal/ai"
 	"github.com/jaypopat/duet/internal/room"
 	"github.com/jaypopat/duet/internal/ui"
 	"github.com/muesli/termenv"
@@ -22,20 +23,27 @@ import (
 type Server struct {
 	addr        string
 	hostKeyPath string
-	workerURL   string
 	roomManager *room.Manager
 	logger      *log.Logger
 }
 
 func New(addr, hostKeyPath, workerURL string) *Server {
+	logger := log.NewWithOptions(os.Stderr, log.Options{
+		Prefix: "duet",
+	})
+
+	var aiClient *ai.Client
+	if workerURL != "" {
+		aiClient = ai.NewClient(workerURL)
+	}
+
+	mgr := room.NewManager(workerURL, aiClient, logger)
+
 	return &Server{
 		addr:        addr,
 		hostKeyPath: hostKeyPath,
-		workerURL:   workerURL,
-		roomManager: room.NewManager(),
-		logger: log.NewWithOptions(os.Stderr, log.Options{
-			Prefix: "duet",
-		}),
+		roomManager: mgr,
+		logger:      logger,
 	}
 }
 
@@ -88,7 +96,7 @@ func (s *Server) teaHandler(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
 		"profile", renderer.ColorProfile(),
 		"hasDark", renderer.HasDarkBackground(),
 	)
-	return ui.New(renderer, s.roomManager, s.workerURL, username), []tea.ProgramOption{
+	return ui.New(renderer, s.roomManager, username), []tea.ProgramOption{
 		tea.WithAltScreen(),
 	}
 }

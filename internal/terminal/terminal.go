@@ -120,6 +120,10 @@ func (t *Terminal) readLoop() {
 	for {
 		n, err := t.ptmx.Read(buf)
 		if err != nil {
+			// Shell process exited
+			t.mu.Lock()
+			t.closed = true
+			t.mu.Unlock()
 			return
 		}
 

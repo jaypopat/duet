@@ -45,9 +45,21 @@ export default {
       return new Response("not found - room ID is required", { status: 404 });
     }
 
+    // Handle room cleanup
+    if (request.method === "DELETE" && (!restPath || restPath === "/")) {
+      const agent = await getAgentByName(env.DUET_AGENT, roomId);
+      const agentUrl = new URL(request.url);
+      agentUrl.pathname = "/cleanup";
+      const headers = new Headers(request.headers);
+      headers.set("x-room-id", roomId);
+      return agent.fetch(
+        new Request(agentUrl, { method: "DELETE", headers })
+      );
+    }
+
     if (restPath !== "/message" && restPath !== "/sandbox/exec") {
       return new Response(
-        "not found - only /message and /sandbox/exec endpoints are supported",
+        "not found - supported: POST /message, POST /sandbox/exec, DELETE /",
         { status: 404 }
       );
     }
@@ -81,8 +93,13 @@ export class DuetAgent extends Agent<Env, DuetAgentState> {
     const url = new URL(request.url);
     const roomId = request.headers.get("x-room-id") || "default";
 
+    // Handle room cleanup
+    if (request.method === "DELETE" && url.pathname === "/cleanup") {
+      return this.handleCleanup(roomId);
+    }
+
     if (request.method !== "POST") {
-      return Response.json({ error: "method not allowed - only POST is supported" }, { status: 405 });
+      return Response.json({ error: "method not allowed" }, { status: 405 });
     }
 
     const rawBody = await request.json();
@@ -222,5 +239,29 @@ export class DuetAgent extends Agent<Env, DuetAgentState> {
         { status: 500 }
       );
     }
+  }
+
+  private async handleCleanup(roomId: string): Promise<Response> {
+    const errors: string[] = [];
+
+    // Reset agent state
+    this.setState({ messages: [] });
+
+    // Terminate sandbox
+    try {
+      const sandbox = getSandbox(this.env.Sandbox, `sandbox-${roomId}`);
+      await sandbox.destroy();
+    } catch (e) {
+      errors.push(`sandbox: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    if (errors.length > 0) {
+      return Response.json(
+        { cleaned: true, errors },
+        { status: 207 }
+      );
+    }
+
+    return Response.json({ cleaned: true, roomId });
   }
 }

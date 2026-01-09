@@ -65,7 +65,7 @@ type toast struct {
 	expires time.Time
 }
 
-func New(renderer *lipgloss.Renderer, roomManager *room.Manager, workerURL, username string) *Model {
+func New(renderer *lipgloss.Renderer, roomManager *room.Manager, username string) *Model {
 	ti := textinput.New()
 	ti.CharLimit = 100
 	ti.Width = 40
@@ -74,10 +74,7 @@ func New(renderer *lipgloss.Renderer, roomManager *room.Manager, workerURL, user
 	cmdInput.CharLimit = 500
 	cmdInput.Width = 60
 
-	var aiClient *ai.Client
-	if workerURL != "" {
-		aiClient = ai.NewClient(workerURL)
-	}
+	aiClient := roomManager.GetAIClient()
 
 	styles := NewStyles(renderer)
 
@@ -680,10 +677,7 @@ func (m *Model) waitForTerminalUpdate() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		_, ok := <-m.termUpdateCh
-		if !ok {
-			return nil // Channel closed
-		}
+		<-m.termUpdateCh
 		return terminalUpdateMsg{}
 	}
 }

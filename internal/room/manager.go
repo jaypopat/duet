@@ -1,17 +1,22 @@
 package room
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/google/uuid"
+	"github.com/jaypopat/duet/internal/ai"
 )
 
 var (
@@ -32,14 +37,26 @@ func slugify(s string) string {
 }
 
 type Manager struct {
-	rooms map[string]*Room
-	mu    sync.RWMutex
+	rooms     map[string]*Room
+	mu        sync.RWMutex
+	workerURL string
+	aiClient  *ai.Client // Shared across all sessions
+	logger    *log.Logger
 }
 
-func NewManager() *Manager {
+func NewManager(workerURL string, aiClient *ai.Client, logger *log.Logger) *Manager {
 	return &Manager{
-		rooms: make(map[string]*Room),
+		rooms:     make(map[string]*Room),
+		workerURL: workerURL,
+		aiClient:  aiClient,
+		logger:    logger,
 	}
+}
+
+func (m *Manager) GetAIClient() *ai.Client {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.aiClient
 }
 
 func (m *Manager) CreateRoom(host, description string) (*Room, error) {
@@ -121,8 +138,47 @@ func (m *Manager) LeaveRoom(roomID, clientID string) bool {
 		if room.WorkspaceDir != "" {
 			os.RemoveAll(room.WorkspaceDir)
 		}
+		// Cleanup external resources (sandbox, agent state) if worker configured
+		if m.workerURL != "" {
+			go m.cleanupRoomResources(roomID)
+		}
 		delete(m.rooms, roomID)
 		return true
 	}
 	return false
+}
+
+func (m *Manager) cleanupRoomResources(roomID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	url := fmt.Sprintf("%s/api/rooms/%s", m.workerURL, roomID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Warn("failed to create cleanup request", "roomID", roomID, "error", err)
+		}
+		return
+	}
+	
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		if m.logger != nil {
+			m.logger.Warn("failed to cleanup room resources", "roomID", roomID, "error", err)
+		}
+		return
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode >= 400 {
+		if m.logger != nil {
+			m.logger.Warn("cleanup request failed", "roomID", roomID, "status", resp.StatusCode)
+		}
+		return
+	}
+	
+	if m.logger != nil {
+		m.logger.Info("cleaned up room resources", "roomID", roomID)
+	}
 }
