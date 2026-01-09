@@ -11,6 +11,8 @@ SSH-first pair programming tool built with Go + Charm (Bubbletea/Wish).
 - Usecases include teaching, interviews, and collaborative coding
 - The session has nvim and nodejs which allows for a seamless peer programming session
 
+**NOTE** - sandboxing feature only works locally since it requires a paid plan
+
 ## How to access hosted version
 Connect to the app using `ssh <username>@duet.jaypopat.me`
 
@@ -25,7 +27,7 @@ Connect to this using the command `ssh <username>@localhost -p 2222`
 - Cloudflare Workers
 - Cloudflare LLM (Llama)
 - Cloudflare Durable Object (per room LLM Context/memory)
-- Cloudflare Sandboxes - worker can exec commands (optionally using the ai response)
+- Cloudflare Sandboxes - worker can exec commands (optionally using the ai response) - works 
 
 ---
 
